@@ -39,8 +39,7 @@ a "stringUnit".
 
 This tool exposes eight subcommands -- list, get, find-key, find-value, add,
 update, delete, total-key-count -- for scripting edits to this format from
-outside Xcode. See XCSTRINGSTOOL.md for a full worked example of every
-subcommand.
+outside Xcode. Pass --full-help to print the full docs.
 """
 
 from __future__ import annotations
@@ -56,6 +55,51 @@ from typing import Any
 
 STATE_CHOICES = ("new", "needs_review", "translated")
 PLURAL_CATEGORIES = ("zero", "one", "two", "few", "many", "other")
+
+# Embedded (rather than read from an external docs file) so --full-help
+# works even if this script is copied or invoked on its own, away from the
+# rest of the repo.
+FULL_HELP_TEXT = """\
+# xcstrings-cli
+
+**Use this tool, not ad-hoc Python, to inspect or edit an `.xcstrings` file.** It's already executable with the interpreter in its shebang — run `xcstrings-cli ...`, not `python3 xcstrings-cli ...`.
+
+CLI for reading/editing an Xcode String Catalog (`Canopy/Localizable.xcstrings` in this project) without Xcode. Stdlib-only Python 3.9+.
+
+```
+xcstrings-cli <command> [args] [--file PATH]
+```
+
+`--file` is optional: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list`/`get`/`find-key`/`find-value`/`total-key-count` are read-only. `add`/`update`/`delete` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
+
+Pass `--full-help` (in place of a subcommand) to print this file's contents directly, e.g. `xcstrings-cli --full-help`.
+
+## Commands
+
+| Command | Purpose | Key flags | Example |
+|---|---|---|---|
+| `list` | List keys | `--lang LANG` (has localization), `--missing LANG` (lacks one), `--state {new,needs_review,translated}` | `list --missing fr` |
+| `get KEY` | Show one entry | `--lang LANG` (one language only), `--json` (raw JSON) | `get cancelButton --lang fr` |
+| `find-key TEXT` | Case-insensitive substring search over keys, printing one match per line; if `TEXT` contains `* ? [`, it's a glob pattern matched against the whole key instead (e.g. `shared*lant*`) | `--case-sensitive` | `find-key 'shared*lant*'` |
+| `find-value TEXT` | Same search, over localization values instead of keys; prints `key  (lang/category: 'value')` per match | `--lang LANG`, `--case-sensitive` | `find-value Annuler --lang fr` |
+| `total-key-count` | Print number of keys in catalog | — | `total-key-count` |
+| `add KEY` | Create a new entry (errors if key exists) | `--value STR` (simple string) *or* `--plural CATEGORY=VALUE` (repeatable, mutually exclusive with `--value`), `--lang` (default `en`), `--state {new,needs_review,translated}` (default `translated`), `--extraction-state` (default `manual`), `--comment` | `add cancelButton --value 'Cancel'` |
+| `update KEY` | Modify an existing entry (errors if key missing); pass only the fields you want to change | `--value STR` *or* `--plural CATEGORY=VALUE` (repeatable), `--lang` (default `en`), `--state {new,needs_review,translated}` (no default — omit to leave state unchanged), `--comment` (no `--extraction-state`) | `update cancelButton --lang fr --value 'Annuler'` |
+| `delete KEY` | Remove an entry, or one language from it | `--lang LANG` (omit to delete the whole entry) | `delete cancelButton --lang fr` |
+
+Plural categories are CLDR: `zero one two few many other` (not all apply to every language); pass one `--plural cat=value` per category. `update --plural other='...'` touches only that category, leaving others untouched.
+
+## Format notes
+
+Each entry's `localizations[lang]` is either `{"stringUnit": {"state", "value"}}` (plain string) or `{"variations": {"plural": {category: {"stringUnit": {...}}}}}`. `state` progresses `new` → `needs_review` → `translated`. Entries also carry `extractionState` (always `manual` in this project) and an optional translator `comment`.
+
+## Testing
+
+```
+python3 -m unittest test_xcstrings_cli.py -v
+```
+Covers every subcommand against a fixture catalog plus a byte-for-byte round-trip check against `Canopy/Localizable.xcstrings` to confirm output formatting matches Xcode's own.
+"""
 
 
 class CLIError(Exception):
@@ -306,6 +350,12 @@ def cmd_delete(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
 READ_ONLY_COMMANDS = {"list", "get", "find-key", "find-value", "total-key-count"}
 
 
+def print_full_help() -> int:
+    """Print the full docs (FULL_HELP_TEXT), for --full-help."""
+    print(FULL_HELP_TEXT, end="")
+    return 0
+
+
 def _make_file_parent() -> argparse.ArgumentParser:
     """A shared parent parser for --file, attached to each subcommand (so it goes after the subcommand name, e.g. `list --file path`)."""
     file_parent = argparse.ArgumentParser(add_help=False)
@@ -326,25 +376,30 @@ def build_parser() -> argparse.ArgumentParser:
     file_parent = _make_file_parent()
 
     parser = argparse.ArgumentParser(
-        prog="xcstringstool.py",
+        prog="xcstrings-cli",
         description="Inspect and edit an Xcode String Catalog (.xcstrings) file from the command line.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  xcstringstool.py list --missing fr\n"
-            "  xcstringstool.py get cancelButton\n"
-            "  xcstringstool.py find-key 'shared*lant*'\n"
-            "  xcstringstool.py add cancelButton --value 'Cancel'\n"
-            "  xcstringstool.py update cancelButton --lang fr --value 'Annuler'\n"
-            "  xcstringstool.py total-key-count\n"
+            "  xcstrings-cli list --missing fr\n"
+            "  xcstrings-cli get cancelButton\n"
+            "  xcstrings-cli find-key 'shared*lant*'\n"
+            "  xcstrings-cli add cancelButton --value 'Cancel'\n"
+            "  xcstrings-cli update cancelButton --lang fr --value 'Annuler'\n"
+            "  xcstrings-cli total-key-count\n"
             "\n"
             "By default the tool operates on the first .xcstrings file found under\n"
             "the current directory (searched recursively, skipping dot-directories\n"
             "such as .git or .claude); pass --file PATH after any subcommand to\n"
             "target a different catalog.\n"
             "\n"
-            "See XCSTRINGSTOOL.md for a full worked example of every subcommand."
+            "Pass --full-help for a full worked example of every subcommand."
         ),
+    )
+    parser.add_argument(
+        "--full-help",
+        action="store_true",
+        help="print the full docs (command reference and format notes) and exit",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -356,9 +411,9 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstringstool.py list\n"
-            "  xcstringstool.py list --lang fr --state needs_review\n"
-            "  xcstringstool.py list --missing fr\n"
+            "  xcstrings-cli list\n"
+            "  xcstrings-cli list --lang fr --state needs_review\n"
+            "  xcstrings-cli list --missing fr\n"
         ),
     )
     list_parser.add_argument("--lang", help="only list keys that have a localization for LANG")
@@ -372,9 +427,9 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstringstool.py get cancelButton\n"
-            "  xcstringstool.py get cancelButton --lang fr\n"
-            "  xcstringstool.py get cancelButton --json\n"
+            "  xcstrings-cli get cancelButton\n"
+            "  xcstrings-cli get cancelButton --lang fr\n"
+            "  xcstrings-cli get cancelButton --json\n"
         ),
     )
     get_parser.add_argument("key", help="the string key to show")
@@ -388,8 +443,8 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstringstool.py find-key cancel\n"
-            "  xcstringstool.py find-key 'shared*lant*'\n"
+            "  xcstrings-cli find-key cancel\n"
+            "  xcstrings-cli find-key 'shared*lant*'\n"
         ),
     )
     find_key_parser.add_argument(
@@ -405,9 +460,9 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstringstool.py find-value Annuler\n"
-            "  xcstringstool.py find-value Annuler --lang fr\n"
-            "  xcstringstool.py find-value '*day ago'\n"
+            "  xcstrings-cli find-value Annuler\n"
+            "  xcstrings-cli find-value Annuler --lang fr\n"
+            "  xcstrings-cli find-value '*day ago'\n"
         ),
     )
     find_value_parser.add_argument(
@@ -422,7 +477,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="print the total number of keys in the catalog",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
-        epilog=("examples:\n" "  xcstringstool.py total-key-count\n"),
+        epilog=("examples:\n" "  xcstrings-cli total-key-count\n"),
     )
 
     add_parser = subparsers.add_parser(
@@ -432,9 +487,9 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstringstool.py add cancelButton --value 'Cancel'\n"
-            "  xcstringstool.py add cancelButton --value 'Cancel' --state new --comment 'Shown in dialogs'\n"
-            "  xcstringstool.py add daysAgoLabel --plural one='%d day ago' other='%d days ago'\n"
+            "  xcstrings-cli add cancelButton --value 'Cancel'\n"
+            "  xcstrings-cli add cancelButton --value 'Cancel' --state new --comment 'Shown in dialogs'\n"
+            "  xcstrings-cli add daysAgoLabel --plural one='%d day ago' other='%d days ago'\n"
         ),
     )
     add_parser.add_argument("key", help="the new string key")
@@ -457,10 +512,10 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstringstool.py update cancelButton --value 'Nevermind'\n"
-            "  xcstringstool.py update cancelButton --lang fr --value 'Annuler' --state translated\n"
-            "  xcstringstool.py update daysAgoLabel --plural other='%d days ago now'\n"
-            "  xcstringstool.py update cancelButton --state needs_review\n"
+            "  xcstrings-cli update cancelButton --value 'Nevermind'\n"
+            "  xcstrings-cli update cancelButton --lang fr --value 'Annuler' --state translated\n"
+            "  xcstrings-cli update daysAgoLabel --plural other='%d days ago now'\n"
+            "  xcstrings-cli update cancelButton --state needs_review\n"
         ),
     )
     update_parser.add_argument("key", help="the string key to update")
@@ -482,8 +537,8 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstringstool.py delete oldUnusedKey\n"
-            "  xcstringstool.py delete cancelButton --lang fr\n"
+            "  xcstrings-cli delete oldUnusedKey\n"
+            "  xcstrings-cli delete cancelButton --lang fr\n"
         ),
     )
     delete_parser.add_argument("key", help="the string key to delete")
@@ -493,6 +548,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    raw_args = sys.argv[1:] if argv is None else argv
+    if "--full-help" in raw_args:
+        return print_full_help()
+
     parser = build_parser()
     args = parser.parse_args(argv)
 

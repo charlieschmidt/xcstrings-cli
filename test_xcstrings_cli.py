@@ -1,11 +1,19 @@
-"""Unit tests for xcstringstool.py, covering list/get/find/add/update/delete against a small fixture catalog."""
+"""Unit tests for xcstrings-cli, covering list/get/find/add/update/delete against a small fixture catalog."""
 
+import contextlib
+import importlib.machinery
+import importlib.util
+import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
-import xcstringstool.xcstringstool as cli
+_script_path = Path(__file__).resolve().parent / "xcstrings-cli"
+_loader = importlib.machinery.SourceFileLoader("xcstrings_cli", str(_script_path))
+_spec = importlib.util.spec_from_loader(_loader.name, _loader)
+cli = importlib.util.module_from_spec(_spec)
+_loader.exec_module(cli)
 
 
 def make_fixture() -> dict:
@@ -371,6 +379,13 @@ class MainEntryPointTests(unittest.TestCase):
             cli.save_catalog(path, make_fixture())
             with self.assertRaises(SystemExit):
                 cli.main(["add", "x", "--value", "a", "--plural", "one=b", "--file", str(path)])
+
+    def test_full_help_prints_docs_file(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.assertEqual(cli.main(["--full-help"]), 0)
+        self.assertIn("xcstrings-cli", buf.getvalue())
+        self.assertIn("## Commands", buf.getvalue())
 
 
 if __name__ == "__main__":
