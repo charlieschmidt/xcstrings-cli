@@ -81,7 +81,7 @@ Pass `--full-help` (in place of a subcommand) to print this file's contents dire
 |---|---|---|---|
 | `list-keys` | List keys | `--lang LANG` (has localization), `--missing LANG` (lacks one), `--state {new,needs_review,translated}` | `list-keys --missing fr` |
 | `get-key KEY` | Show one entry | `--lang LANG` (one language only), `--json` (raw JSON) | `get-key cancelButton --lang fr` |
-| `find-key TEXT` | Case-insensitive substring search over keys, printing one match per line; if `TEXT` contains `* ? [`, it's a glob pattern matched against the whole key instead (e.g. `shared*lant*`) | `--case-sensitive` | `find-key 'shared*lant*'` |
+| `find-key TEXT` | Case-insensitive substring search over keys, printing one match per line; if `TEXT` contains `* ? [`, it's a glob pattern matched against the whole key instead (e.g. `*wild*card*`) | `--case-sensitive` | `find-key '*wild*card*'` |
 | `find-value TEXT` | Same search, over localization values instead of keys; prints `key  (lang/category: 'value')` per match | `--lang LANG`, `--case-sensitive` | `find-value Annuler --lang fr` |
 | `get-source-language` | Print the catalog's `sourceLanguage` | — | `get-source-language` |
 | `count-keys` | Print number of keys in catalog | — | `count-keys` |
@@ -404,7 +404,7 @@ def build_parser() -> argparse.ArgumentParser:
             "examples:\n"
             "  xcstrings-cli list-keys --missing fr\n"
             "  xcstrings-cli get-key cancelButton\n"
-            "  xcstrings-cli find-key 'shared*lant*'\n"
+            "  xcstrings-cli find-key '*wild*card*'\n"
             "  xcstrings-cli add-key cancelButton --value 'Cancel'\n"
             "  xcstrings-cli update-key cancelButton --lang fr --value 'Annuler'\n"
             "  xcstrings-cli get-source-language\n"
@@ -467,7 +467,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             "examples:\n"
             "  xcstrings-cli find-key cancel\n"
-            "  xcstrings-cli find-key 'shared*lant*'\n"
+            "  xcstrings-cli find-key '*wild*card*'\n"
         ),
     )
     find_key_parser.add_argument(
