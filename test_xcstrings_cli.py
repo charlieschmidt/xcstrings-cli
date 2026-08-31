@@ -352,6 +352,25 @@ class TotalKeyCountCommandTests(unittest.TestCase):
         self.assertEqual(buf.getvalue().strip(), "2")
 
 
+class TotalLanguageCountCommandTests(unittest.TestCase):
+    def setUp(self):
+        self.catalog = make_fixture()
+
+    def _output(self, extra_args):
+        args = cli.build_parser().parse_args(["total-language-count", *extra_args])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli.cmd_total_language_count(args, self.catalog)
+        return buf.getvalue().splitlines()
+
+    def test_total_language_count_prints_count(self):
+        # fixture uses "en" and "fr" across its two keys
+        self.assertEqual(self._output([]), ["2"])
+
+    def test_total_language_count_list_prints_languages(self):
+        self.assertEqual(self._output(["--list"]), ["2", "en", "fr"])
+
+
 class MainEntryPointTests(unittest.TestCase):
     def test_end_to_end_add_update_delete(self):
         with tempfile.TemporaryDirectory() as tmp:

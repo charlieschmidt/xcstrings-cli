@@ -37,9 +37,9 @@ localization is either a plain "stringUnit" (a value + a state of "new",
 categories ("zero", "one", "two", "few", "many", "other"), each itself holding
 a "stringUnit".
 
-This tool exposes eight subcommands -- list, get, find-key, find-value, add,
-update, delete, total-key-count -- for scripting edits to this format from
-outside Xcode. Pass --full-help to print the full docs.
+This tool exposes nine subcommands -- list, get, find-key, find-value, add,
+update, delete, total-key-count, total-language-count -- for scripting edits
+to this format from outside Xcode. Pass --full-help to print the full docs.
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ CLI for reading/editing an Xcode String Catalog (`Canopy/Localizable.xcstrings` 
 xcstrings-cli <command> [args] [--file PATH]
 ```
 
-`--file` is optional: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list`/`get`/`find-key`/`find-value`/`total-key-count` are read-only. `add`/`update`/`delete` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
+`--file` is optional: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list`/`get`/`find-key`/`find-value`/`total-key-count`/`total-language-count` are read-only. `add`/`update`/`delete` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
 
 Pass `--full-help` (in place of a subcommand) to print this file's contents directly, e.g. `xcstrings-cli --full-help`.
 
@@ -83,6 +83,7 @@ Pass `--full-help` (in place of a subcommand) to print this file's contents dire
 | `find-key TEXT` | Case-insensitive substring search over keys, printing one match per line; if `TEXT` contains `* ? [`, it's a glob pattern matched against the whole key instead (e.g. `shared*lant*`) | `--case-sensitive` | `find-key 'shared*lant*'` |
 | `find-value TEXT` | Same search, over localization values instead of keys; prints `key  (lang/category: 'value')` per match | `--lang LANG`, `--case-sensitive` | `find-value Annuler --lang fr` |
 | `total-key-count` | Print number of keys in catalog | — | `total-key-count` |
+| `total-language-count` | Print number of distinct languages used anywhere in the catalog (union of every key's localizations) | `--list` (also print each language code) | `total-language-count --list` |
 | `add KEY` | Create a new entry (errors if key exists) | `--value STR` (simple string) *or* `--plural CATEGORY=VALUE` (repeatable, mutually exclusive with `--value`), `--lang` (default `en`), `--state {new,needs_review,translated}` (default `translated`), `--extraction-state` (default `manual`), `--comment` | `add cancelButton --value 'Cancel'` |
 | `update KEY` | Modify an existing entry (errors if key missing); pass only the fields you want to change | `--value STR` *or* `--plural CATEGORY=VALUE` (repeatable), `--lang` (default `en`), `--state {new,needs_review,translated}` (no default — omit to leave state unchanged), `--comment` (no `--extraction-state`) | `update cancelButton --lang fr --value 'Annuler'` |
 | `delete KEY` | Remove an entry, or one language from it | `--lang LANG` (omit to delete the whole entry) | `delete cancelButton --lang fr` |
@@ -295,6 +296,19 @@ def cmd_total_key_count(args: argparse.Namespace, catalog: dict[str, Any]) -> No
     print(len(_entries(catalog)))
 
 
+def cmd_total_language_count(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+    """Print the number of distinct languages used anywhere in the catalog (union across all keys)."""
+    entries = _entries(catalog)
+    langs: set[str] = set()
+    for entry in entries.values():
+        langs.update(entry.get("localizations", {}).keys())
+
+    print(len(langs))
+    if args.list:
+        for lang in sorted(langs):
+            print(lang)
+
+
 def cmd_add(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Create a new entry; raises CLIError if the key already exists."""
     entries = _entries(catalog)
@@ -347,7 +361,7 @@ def cmd_delete(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
         del _entries(catalog)[args.key]
 
 
-READ_ONLY_COMMANDS = {"list", "get", "find-key", "find-value", "total-key-count"}
+READ_ONLY_COMMANDS = {"list", "get", "find-key", "find-value", "total-key-count", "total-language-count"}
 
 
 def print_full_help() -> int:
@@ -387,6 +401,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  xcstrings-cli add cancelButton --value 'Cancel'\n"
             "  xcstrings-cli update cancelButton --lang fr --value 'Annuler'\n"
             "  xcstrings-cli total-key-count\n"
+            "  xcstrings-cli total-language-count\n"
             "\n"
             "By default the tool operates on the first .xcstrings file found under\n"
             "the current directory (searched recursively, skipping dot-directories\n"
@@ -478,6 +493,21 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
         epilog=("examples:\n" "  xcstrings-cli total-key-count\n"),
+    )
+
+    total_language_count_parser = subparsers.add_parser(
+        "total-language-count",
+        help="print the number of distinct languages used anywhere in the catalog",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        parents=[file_parent],
+        epilog=(
+            "examples:\n"
+            "  xcstrings-cli total-language-count\n"
+            "  xcstrings-cli total-language-count --list\n"
+        ),
+    )
+    total_language_count_parser.add_argument(
+        "--list", action="store_true", help="also print each language code, one per line"
     )
 
     add_parser = subparsers.add_parser(
@@ -578,6 +608,7 @@ def main(argv: list[str] | None = None) -> int:
             "find-key": cmd_find_key,
             "find-value": cmd_find_value,
             "total-key-count": cmd_total_key_count,
+            "total-language-count": cmd_total_language_count,
             "add": cmd_add,
             "update": cmd_update,
             "delete": cmd_delete,
