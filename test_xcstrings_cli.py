@@ -86,13 +86,13 @@ class RealCatalogFormatTests(unittest.TestCase):
             self.assertEqual(out_path.read_bytes(), original_bytes)
 
 
-class AddCommandTests(unittest.TestCase):
+class AddKeyCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
 
     def test_add_simple_entry(self):
-        args = cli.build_parser().parse_args(["add", "newKey", "--value", "Hello", "--lang", "en"])
-        cli.cmd_add(args, self.catalog)
+        args = cli.build_parser().parse_args(["add-key", "newKey", "--value", "Hello", "--lang", "en"])
+        cli.cmd_add_key(args, self.catalog)
         entry = self.catalog["strings"]["newKey"]
         self.assertEqual(entry["extractionState"], "manual")
         self.assertEqual(entry["localizations"]["en"]["stringUnit"]["value"], "Hello")
@@ -100,125 +100,125 @@ class AddCommandTests(unittest.TestCase):
 
     def test_add_plural_entry(self):
         args = cli.build_parser().parse_args(
-            ["add", "itemsLabel", "--plural", "one=1 item", "--plural", "other=%d items"]
+            ["add-key", "itemsLabel", "--plural", "one=1 item", "--plural", "other=%d items"]
         )
-        cli.cmd_add(args, self.catalog)
+        cli.cmd_add_key(args, self.catalog)
         plural = self.catalog["strings"]["itemsLabel"]["localizations"]["en"]["variations"]["plural"]
         self.assertEqual(plural["one"]["stringUnit"]["value"], "1 item")
         self.assertEqual(plural["other"]["stringUnit"]["value"], "%d items")
 
     def test_add_duplicate_key_raises(self):
-        args = cli.build_parser().parse_args(["add", "cancelButton", "--value", "x"])
+        args = cli.build_parser().parse_args(["add-key", "cancelButton", "--value", "x"])
         with self.assertRaises(cli.CLIError):
-            cli.cmd_add(args, self.catalog)
+            cli.cmd_add_key(args, self.catalog)
 
     def test_add_with_comment_and_state(self):
         args = cli.build_parser().parse_args(
-            ["add", "newKey", "--value", "Hi", "--state", "new", "--comment", "shown in header"]
+            ["add-key", "newKey", "--value", "Hi", "--state", "new", "--comment", "shown in header"]
         )
-        cli.cmd_add(args, self.catalog)
+        cli.cmd_add_key(args, self.catalog)
         entry = self.catalog["strings"]["newKey"]
         self.assertEqual(entry["comment"], "shown in header")
         self.assertEqual(entry["localizations"]["en"]["stringUnit"]["state"], "new")
 
 
-class UpdateCommandTests(unittest.TestCase):
+class UpdateKeyCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
 
     def test_update_simple_value_preserves_other_languages(self):
-        args = cli.build_parser().parse_args(["update", "cancelButton", "--value", "Nevermind"])
-        cli.cmd_update(args, self.catalog)
+        args = cli.build_parser().parse_args(["update-key", "cancelButton", "--value", "Nevermind"])
+        cli.cmd_update_key(args, self.catalog)
         localizations = self.catalog["strings"]["cancelButton"]["localizations"]
         self.assertEqual(localizations["en"]["stringUnit"]["value"], "Nevermind")
         self.assertEqual(localizations["fr"]["stringUnit"]["value"], "Annuler?")
 
     def test_update_plural_category(self):
-        args = cli.build_parser().parse_args(["update", "daysAgoLabel", "--plural", "other=%d days ago now"])
-        cli.cmd_update(args, self.catalog)
+        args = cli.build_parser().parse_args(["update-key", "daysAgoLabel", "--plural", "other=%d days ago now"])
+        cli.cmd_update_key(args, self.catalog)
         plural = self.catalog["strings"]["daysAgoLabel"]["localizations"]["en"]["variations"]["plural"]
         self.assertEqual(plural["other"]["stringUnit"]["value"], "%d days ago now")
         self.assertEqual(plural["one"]["stringUnit"]["value"], "%d day ago")
 
     def test_update_state_only(self):
-        args = cli.build_parser().parse_args(["update", "cancelButton", "--state", "needs_review"])
-        cli.cmd_update(args, self.catalog)
+        args = cli.build_parser().parse_args(["update-key", "cancelButton", "--state", "needs_review"])
+        cli.cmd_update_key(args, self.catalog)
         self.assertEqual(
             self.catalog["strings"]["cancelButton"]["localizations"]["en"]["stringUnit"]["state"],
             "needs_review",
         )
 
     def test_update_missing_key_raises(self):
-        args = cli.build_parser().parse_args(["update", "noSuchKey", "--value", "x"])
+        args = cli.build_parser().parse_args(["update-key", "noSuchKey", "--value", "x"])
         with self.assertRaises(cli.CLIError):
-            cli.cmd_update(args, self.catalog)
+            cli.cmd_update_key(args, self.catalog)
 
     def test_update_new_language_creates_localization(self):
-        args = cli.build_parser().parse_args(["update", "cancelButton", "--lang", "de", "--value", "Abbrechen"])
-        cli.cmd_update(args, self.catalog)
+        args = cli.build_parser().parse_args(["update-key", "cancelButton", "--lang", "de", "--value", "Abbrechen"])
+        cli.cmd_update_key(args, self.catalog)
         self.assertEqual(
             self.catalog["strings"]["cancelButton"]["localizations"]["de"]["stringUnit"]["value"],
             "Abbrechen",
         )
 
 
-class DeleteCommandTests(unittest.TestCase):
+class DeleteKeyCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
 
     def test_delete_whole_entry(self):
-        args = cli.build_parser().parse_args(["delete", "cancelButton"])
-        cli.cmd_delete(args, self.catalog)
+        args = cli.build_parser().parse_args(["delete-key", "cancelButton"])
+        cli.cmd_delete_key(args, self.catalog)
         self.assertNotIn("cancelButton", self.catalog["strings"])
 
     def test_delete_single_language(self):
-        args = cli.build_parser().parse_args(["delete", "cancelButton", "--lang", "fr"])
-        cli.cmd_delete(args, self.catalog)
+        args = cli.build_parser().parse_args(["delete-key", "cancelButton", "--lang", "fr"])
+        cli.cmd_delete_key(args, self.catalog)
         localizations = self.catalog["strings"]["cancelButton"]["localizations"]
         self.assertNotIn("fr", localizations)
         self.assertIn("en", localizations)
 
     def test_delete_missing_key_raises(self):
-        args = cli.build_parser().parse_args(["delete", "noSuchKey"])
+        args = cli.build_parser().parse_args(["delete-key", "noSuchKey"])
         with self.assertRaises(cli.CLIError):
-            cli.cmd_delete(args, self.catalog)
+            cli.cmd_delete_key(args, self.catalog)
 
     def test_delete_missing_language_raises(self):
-        args = cli.build_parser().parse_args(["delete", "cancelButton", "--lang", "de"])
+        args = cli.build_parser().parse_args(["delete-key", "cancelButton", "--lang", "de"])
         with self.assertRaises(cli.CLIError):
-            cli.cmd_delete(args, self.catalog)
+            cli.cmd_delete_key(args, self.catalog)
 
 
-class GetCommandTests(unittest.TestCase):
+class GetKeyCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
 
     def test_get_missing_key_raises(self):
-        args = cli.build_parser().parse_args(["get", "noSuchKey"])
+        args = cli.build_parser().parse_args(["get-key", "noSuchKey"])
         with self.assertRaises(cli.CLIError):
-            cli.cmd_get(args, self.catalog)
+            cli.cmd_get_key(args, self.catalog)
 
     def test_get_prints_summary(self):
-        args = cli.build_parser().parse_args(["get", "cancelButton"])
+        args = cli.build_parser().parse_args(["get-key", "cancelButton"])
         import io
         import contextlib
 
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cli.cmd_get(args, self.catalog)
+            cli.cmd_get_key(args, self.catalog)
         output = buf.getvalue()
         self.assertIn("cancelButton", output)
         self.assertIn("Cancel", output)
         self.assertIn("Annuler?", output)
 
     def test_get_json_output_is_valid_json(self):
-        args = cli.build_parser().parse_args(["get", "cancelButton", "--json"])
+        args = cli.build_parser().parse_args(["get-key", "cancelButton", "--json"])
         import io
         import contextlib
 
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cli.cmd_get(args, self.catalog)
+            cli.cmd_get_key(args, self.catalog)
         parsed = json.loads(buf.getvalue())
         self.assertEqual(parsed, self.catalog["strings"]["cancelButton"])
 
@@ -226,9 +226,9 @@ class GetCommandTests(unittest.TestCase):
         import io
         import contextlib
 
-        args = cli.build_parser().parse_args(["get", "cancelButton", "--lang", "de"])
+        args = cli.build_parser().parse_args(["get-key", "cancelButton", "--lang", "de"])
         with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(cli.CLIError):
-            cli.cmd_get(args, self.catalog)
+            cli.cmd_get_key(args, self.catalog)
 
 
 class FindKeyCommandTests(unittest.TestCase):
@@ -306,7 +306,7 @@ class FindValueCommandTests(unittest.TestCase):
         self.assertIn("daysAgoLabel", output)
 
 
-class ListCommandTests(unittest.TestCase):
+class ListKeysCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
 
@@ -317,69 +317,69 @@ class ListCommandTests(unittest.TestCase):
         args = cli.build_parser().parse_args(argv)
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cli.cmd_list(args, self.catalog)
+            cli.cmd_list_keys(args, self.catalog)
         return buf.getvalue().splitlines()
 
     def test_list_all_keys(self):
-        keys = self._output(["list"])
+        keys = self._output(["list-keys"])
         self.assertEqual(keys, ["cancelButton", "daysAgoLabel"])
 
     def test_list_filtered_by_lang(self):
-        keys = self._output(["list", "--lang", "fr"])
+        keys = self._output(["list-keys", "--lang", "fr"])
         self.assertEqual(keys, ["cancelButton"])
 
     def test_list_filtered_by_state(self):
-        keys = self._output(["list", "--lang", "fr", "--state", "needs_review"])
+        keys = self._output(["list-keys", "--lang", "fr", "--state", "needs_review"])
         self.assertEqual(keys, ["cancelButton"])
 
     def test_list_missing_language(self):
-        keys = self._output(["list", "--missing", "fr"])
+        keys = self._output(["list-keys", "--missing", "fr"])
         self.assertEqual(keys, ["daysAgoLabel"])
 
 
-class SourceLanguageCommandTests(unittest.TestCase):
+class GetSourceLanguageCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
 
     def test_source_language_prints_source_language(self):
-        args = cli.build_parser().parse_args(["source-language"])
+        args = cli.build_parser().parse_args(["get-source-language"])
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cli.cmd_source_language(args, self.catalog)
+            cli.cmd_get_source_language(args, self.catalog)
         self.assertEqual(buf.getvalue().strip(), "en")
 
 
-class TotalKeyCountCommandTests(unittest.TestCase):
+class CountKeysCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
 
-    def test_total_key_count_prints_count(self):
+    def test_count_keys_prints_count(self):
         import io
         import contextlib
 
-        args = cli.build_parser().parse_args(["total-key-count"])
+        args = cli.build_parser().parse_args(["count-keys"])
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cli.cmd_total_key_count(args, self.catalog)
+            cli.cmd_count_keys(args, self.catalog)
         self.assertEqual(buf.getvalue().strip(), "2")
 
 
-class TotalLanguageCountCommandTests(unittest.TestCase):
+class CountKeyLanguagesCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
 
     def _output(self, extra_args):
-        args = cli.build_parser().parse_args(["total-language-count", *extra_args])
+        args = cli.build_parser().parse_args(["count-key-languages", *extra_args])
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cli.cmd_total_language_count(args, self.catalog)
+            cli.cmd_count_key_languages(args, self.catalog)
         return buf.getvalue().splitlines()
 
-    def test_total_language_count_prints_count(self):
+    def test_count_key_languages_prints_count(self):
         # fixture uses "en" and "fr" across its two keys
         self.assertEqual(self._output([]), ["2"])
 
-    def test_total_language_count_list_prints_languages(self):
+    def test_count_key_languages_list_prints_languages(self):
         self.assertEqual(self._output(["--list"]), ["2", "en", "fr"])
 
 
@@ -389,27 +389,27 @@ class MainEntryPointTests(unittest.TestCase):
             path = Path(tmp) / "Localizable.xcstrings"
             cli.save_catalog(path, make_fixture())
 
-            self.assertEqual(cli.main(["add", "greeting", "--value", "Hi", "--file", str(path)]), 0)
+            self.assertEqual(cli.main(["add-key", "greeting", "--value", "Hi", "--file", str(path)]), 0)
             self.assertEqual(cli.load_catalog(path)["strings"]["greeting"]["localizations"]["en"]["stringUnit"]["value"], "Hi")
 
-            self.assertEqual(cli.main(["update", "greeting", "--value", "Hi there", "--file", str(path)]), 0)
+            self.assertEqual(cli.main(["update-key", "greeting", "--value", "Hi there", "--file", str(path)]), 0)
             self.assertEqual(cli.load_catalog(path)["strings"]["greeting"]["localizations"]["en"]["stringUnit"]["value"], "Hi there")
 
-            self.assertEqual(cli.main(["delete", "greeting", "--file", str(path)]), 0)
+            self.assertEqual(cli.main(["delete-key", "greeting", "--file", str(path)]), 0)
             self.assertNotIn("greeting", cli.load_catalog(path)["strings"])
 
     def test_main_returns_1_on_cli_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "Localizable.xcstrings"
             cli.save_catalog(path, make_fixture())
-            self.assertEqual(cli.main(["delete", "noSuchKey", "--file", str(path)]), 1)
+            self.assertEqual(cli.main(["delete-key", "noSuchKey", "--file", str(path)]), 1)
 
     def test_add_value_and_plural_mutually_exclusive(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "Localizable.xcstrings"
             cli.save_catalog(path, make_fixture())
             with self.assertRaises(SystemExit):
-                cli.main(["add", "x", "--value", "a", "--plural", "one=b", "--file", str(path)])
+                cli.main(["add-key", "x", "--value", "a", "--plural", "one=b", "--file", str(path)])
 
     def test_full_help_prints_docs_file(self):
         buf = io.StringIO()

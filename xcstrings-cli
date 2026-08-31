@@ -37,10 +37,10 @@ localization is either a plain "stringUnit" (a value + a state of "new",
 categories ("zero", "one", "two", "few", "many", "other"), each itself holding
 a "stringUnit".
 
-This tool exposes ten subcommands -- list, get, find-key, find-value, add,
-update, delete, source-language, total-key-count, total-language-count -- for
-scripting edits to this format from outside Xcode. Pass --full-help to print
-the full docs.
+This tool exposes ten subcommands -- list-keys, get-key, find-key, find-value,
+add-key, update-key, delete-key, get-source-language, count-keys,
+count-key-languages -- for scripting edits to this format from outside Xcode.
+Pass --full-help to print the full docs.
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ CLI for reading/editing an Xcode String Catalog (`Canopy/Localizable.xcstrings` 
 xcstrings-cli <command> [args] [--file PATH]
 ```
 
-`--file` is optional: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list`/`get`/`find-key`/`find-value`/`source-language`/`total-key-count`/`total-language-count` are read-only. `add`/`update`/`delete` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
+`--file` is optional: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list-keys`/`get-key`/`find-key`/`find-value`/`get-source-language`/`count-keys`/`count-key-languages` are read-only. `add-key`/`update-key`/`delete-key` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
 
 Pass `--full-help` (in place of a subcommand) to print this file's contents directly, e.g. `xcstrings-cli --full-help`.
 
@@ -79,18 +79,18 @@ Pass `--full-help` (in place of a subcommand) to print this file's contents dire
 
 | Command | Purpose | Key flags | Example |
 |---|---|---|---|
-| `list` | List keys | `--lang LANG` (has localization), `--missing LANG` (lacks one), `--state {new,needs_review,translated}` | `list --missing fr` |
-| `get KEY` | Show one entry | `--lang LANG` (one language only), `--json` (raw JSON) | `get cancelButton --lang fr` |
+| `list-keys` | List keys | `--lang LANG` (has localization), `--missing LANG` (lacks one), `--state {new,needs_review,translated}` | `list-keys --missing fr` |
+| `get-key KEY` | Show one entry | `--lang LANG` (one language only), `--json` (raw JSON) | `get-key cancelButton --lang fr` |
 | `find-key TEXT` | Case-insensitive substring search over keys, printing one match per line; if `TEXT` contains `* ? [`, it's a glob pattern matched against the whole key instead (e.g. `shared*lant*`) | `--case-sensitive` | `find-key 'shared*lant*'` |
 | `find-value TEXT` | Same search, over localization values instead of keys; prints `key  (lang/category: 'value')` per match | `--lang LANG`, `--case-sensitive` | `find-value Annuler --lang fr` |
-| `source-language` | Print the catalog's `sourceLanguage` | — | `source-language` |
-| `total-key-count` | Print number of keys in catalog | — | `total-key-count` |
-| `total-language-count` | Print number of distinct languages used anywhere in the catalog (union of every key's localizations) | `--list` (also print each language code) | `total-language-count --list` |
-| `add KEY` | Create a new entry (errors if key exists) | `--value STR` (simple string) *or* `--plural CATEGORY=VALUE` (repeatable, mutually exclusive with `--value`), `--lang` (default `en`), `--state {new,needs_review,translated}` (default `translated`), `--extraction-state` (default `manual`), `--comment` | `add cancelButton --value 'Cancel'` |
-| `update KEY` | Modify an existing entry (errors if key missing); pass only the fields you want to change | `--value STR` *or* `--plural CATEGORY=VALUE` (repeatable), `--lang` (default `en`), `--state {new,needs_review,translated}` (no default — omit to leave state unchanged), `--comment` (no `--extraction-state`) | `update cancelButton --lang fr --value 'Annuler'` |
-| `delete KEY` | Remove an entry, or one language from it | `--lang LANG` (omit to delete the whole entry) | `delete cancelButton --lang fr` |
+| `get-source-language` | Print the catalog's `sourceLanguage` | — | `get-source-language` |
+| `count-keys` | Print number of keys in catalog | — | `count-keys` |
+| `count-key-languages` | Print number of distinct languages used anywhere in the catalog (union of every key's localizations) | `--list` (also print each language code) | `count-key-languages --list` |
+| `add-key KEY` | Create a new entry (errors if key exists) | `--value STR` (simple string) *or* `--plural CATEGORY=VALUE` (repeatable, mutually exclusive with `--value`), `--lang` (default `en`), `--state {new,needs_review,translated}` (default `translated`), `--extraction-state` (default `manual`), `--comment` | `add-key cancelButton --value 'Cancel'` |
+| `update-key KEY` | Modify an existing entry (errors if key missing); pass only the fields you want to change | `--value STR` *or* `--plural CATEGORY=VALUE` (repeatable), `--lang` (default `en`), `--state {new,needs_review,translated}` (no default — omit to leave state unchanged), `--comment` (no `--extraction-state`) | `update-key cancelButton --lang fr --value 'Annuler'` |
+| `delete-key KEY` | Remove an entry, or one language from it | `--lang LANG` (omit to delete the whole entry) | `delete-key cancelButton --lang fr` |
 
-Plural categories are CLDR: `zero one two few many other` (not all apply to every language); pass one `--plural cat=value` per category. `update --plural other='...'` touches only that category, leaving others untouched.
+Plural categories are CLDR: `zero one two few many other` (not all apply to every language); pass one `--plural cat=value` per category. `update-key --plural other='...'` touches only that category, leaving others untouched.
 
 ## Format notes
 
@@ -206,7 +206,7 @@ def _iter_string_units(localization: dict[str, Any]):
                 yield category, entry["stringUnit"]
 
 
-def cmd_list(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+def cmd_list_keys(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Print keys, optionally filtered by having/lacking a language or by that language's state."""
     entries = _entries(catalog)
     for key in sorted(entries):
@@ -233,7 +233,7 @@ def cmd_list(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
         print(key)
 
 
-def cmd_get(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+def cmd_get_key(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Print a human-readable (or --json) summary of a single entry."""
     entry = _require_entry(catalog, args.key)
 
@@ -293,17 +293,17 @@ def cmd_find_value(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
                     print(f"{key}  ({lang}/{label}: {value!r})")
 
 
-def cmd_source_language(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+def cmd_get_source_language(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Print the catalog's sourceLanguage."""
     print(catalog.get("sourceLanguage", ""))
 
 
-def cmd_total_key_count(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+def cmd_count_keys(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Print the total number of keys in the catalog."""
     print(len(_entries(catalog)))
 
 
-def cmd_total_language_count(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+def cmd_count_key_languages(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Print the number of distinct languages used anywhere in the catalog (union across all keys)."""
     entries = _entries(catalog)
     langs: set[str] = set()
@@ -316,7 +316,7 @@ def cmd_total_language_count(args: argparse.Namespace, catalog: dict[str, Any]) 
             print(lang)
 
 
-def cmd_add(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+def cmd_add_key(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Create a new entry; raises CLIError if the key already exists."""
     entries = _entries(catalog)
     if args.key in entries:
@@ -336,7 +336,7 @@ def cmd_add(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     entries[args.key] = entry
 
 
-def cmd_update(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+def cmd_update_key(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Update an existing entry's value(s), state, and/or comment; raises CLIError if the key doesn't exist."""
     entry = _require_entry(catalog, args.key)
 
@@ -355,7 +355,7 @@ def cmd_update(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
                 unit["state"] = args.state
 
 
-def cmd_delete(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+def cmd_delete_key(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Delete a whole entry, or just one language's localization if --lang is given."""
     entry = _require_entry(catalog, args.key)
 
@@ -368,7 +368,7 @@ def cmd_delete(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
         del _entries(catalog)[args.key]
 
 
-READ_ONLY_COMMANDS = {"list", "get", "find-key", "find-value", "source-language", "total-key-count", "total-language-count"}
+READ_ONLY_COMMANDS = {"list-keys", "get-key", "find-key", "find-value", "get-source-language", "count-keys", "count-key-languages"}
 
 
 def print_full_help() -> int:
@@ -378,7 +378,7 @@ def print_full_help() -> int:
 
 
 def _make_file_parent() -> argparse.ArgumentParser:
-    """A shared parent parser for --file, attached to each subcommand (so it goes after the subcommand name, e.g. `list --file path`)."""
+    """A shared parent parser for --file, attached to each subcommand (so it goes after the subcommand name, e.g. `list-keys --file path`)."""
     file_parent = argparse.ArgumentParser(add_help=False)
     file_parent.add_argument(
         "--file",
@@ -402,14 +402,14 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  xcstrings-cli list --missing fr\n"
-            "  xcstrings-cli get cancelButton\n"
+            "  xcstrings-cli list-keys --missing fr\n"
+            "  xcstrings-cli get-key cancelButton\n"
             "  xcstrings-cli find-key 'shared*lant*'\n"
-            "  xcstrings-cli add cancelButton --value 'Cancel'\n"
-            "  xcstrings-cli update cancelButton --lang fr --value 'Annuler'\n"
-            "  xcstrings-cli source-language\n"
-            "  xcstrings-cli total-key-count\n"
-            "  xcstrings-cli total-language-count\n"
+            "  xcstrings-cli add-key cancelButton --value 'Cancel'\n"
+            "  xcstrings-cli update-key cancelButton --lang fr --value 'Annuler'\n"
+            "  xcstrings-cli get-source-language\n"
+            "  xcstrings-cli count-keys\n"
+            "  xcstrings-cli count-key-languages\n"
             "\n"
             "By default the tool operates on the first .xcstrings file found under\n"
             "the current directory (searched recursively, skipping dot-directories\n"
@@ -427,37 +427,37 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    list_parser = subparsers.add_parser(
-        "list",
+    list_keys_parser = subparsers.add_parser(
+        "list-keys",
         help="list keys in the catalog",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstrings-cli list\n"
-            "  xcstrings-cli list --lang fr --state needs_review\n"
-            "  xcstrings-cli list --missing fr\n"
+            "  xcstrings-cli list-keys\n"
+            "  xcstrings-cli list-keys --lang fr --state needs_review\n"
+            "  xcstrings-cli list-keys --missing fr\n"
         ),
     )
-    list_parser.add_argument("--lang", help="only list keys that have a localization for LANG")
-    list_parser.add_argument("--state", choices=STATE_CHOICES, help="only list keys whose LANG state matches")
-    list_parser.add_argument("--missing", metavar="LANG", help="only list keys with NO localization for LANG")
+    list_keys_parser.add_argument("--lang", help="only list keys that have a localization for LANG")
+    list_keys_parser.add_argument("--state", choices=STATE_CHOICES, help="only list keys whose LANG state matches")
+    list_keys_parser.add_argument("--missing", metavar="LANG", help="only list keys with NO localization for LANG")
 
-    get_parser = subparsers.add_parser(
-        "get",
+    get_key_parser = subparsers.add_parser(
+        "get-key",
         help="show one entry",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstrings-cli get cancelButton\n"
-            "  xcstrings-cli get cancelButton --lang fr\n"
-            "  xcstrings-cli get cancelButton --json\n"
+            "  xcstrings-cli get-key cancelButton\n"
+            "  xcstrings-cli get-key cancelButton --lang fr\n"
+            "  xcstrings-cli get-key cancelButton --json\n"
         ),
     )
-    get_parser.add_argument("key", help="the string key to show")
-    get_parser.add_argument("--lang", help="only show this language's localization")
-    get_parser.add_argument("--json", action="store_true", help="print the raw JSON entry instead of a summary")
+    get_key_parser.add_argument("key", help="the string key to show")
+    get_key_parser.add_argument("--lang", help="only show this language's localization")
+    get_key_parser.add_argument("--json", action="store_true", help="print the raw JSON entry instead of a summary")
 
     find_key_parser = subparsers.add_parser(
         "find-key",
@@ -496,99 +496,99 @@ def build_parser() -> argparse.ArgumentParser:
     find_value_parser.add_argument("--case-sensitive", action="store_true", help="match case exactly")
 
     subparsers.add_parser(
-        "source-language",
+        "get-source-language",
         help="print the catalog's sourceLanguage",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
-        epilog=("examples:\n" "  xcstrings-cli source-language\n"),
+        epilog=("examples:\n" "  xcstrings-cli get-source-language\n"),
     )
 
     subparsers.add_parser(
-        "total-key-count",
+        "count-keys",
         help="print the total number of keys in the catalog",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
-        epilog=("examples:\n" "  xcstrings-cli total-key-count\n"),
+        epilog=("examples:\n" "  xcstrings-cli count-keys\n"),
     )
 
-    total_language_count_parser = subparsers.add_parser(
-        "total-language-count",
+    count_key_languages_parser = subparsers.add_parser(
+        "count-key-languages",
         help="print the number of distinct languages used anywhere in the catalog",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstrings-cli total-language-count\n"
-            "  xcstrings-cli total-language-count --list\n"
+            "  xcstrings-cli count-key-languages\n"
+            "  xcstrings-cli count-key-languages --list\n"
         ),
     )
-    total_language_count_parser.add_argument(
+    count_key_languages_parser.add_argument(
         "--list", action="store_true", help="also print each language code, one per line"
     )
 
-    add_parser = subparsers.add_parser(
-        "add",
+    add_key_parser = subparsers.add_parser(
+        "add-key",
         help="create a new entry",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstrings-cli add cancelButton --value 'Cancel'\n"
-            "  xcstrings-cli add cancelButton --value 'Cancel' --state new --comment 'Shown in dialogs'\n"
-            "  xcstrings-cli add daysAgoLabel --plural one='%d day ago' other='%d days ago'\n"
+            "  xcstrings-cli add-key cancelButton --value 'Cancel'\n"
+            "  xcstrings-cli add-key cancelButton --value 'Cancel' --state new --comment 'Shown in dialogs'\n"
+            "  xcstrings-cli add-key daysAgoLabel --plural one='%d day ago' other='%d days ago'\n"
         ),
     )
-    add_parser.add_argument("key", help="the new string key")
-    add_parser.add_argument("--lang", default="en", help="language code for the localization (default: en)")
-    add_parser.add_argument("--value", help="the string value for a simple (non-plural) entry")
-    add_parser.add_argument(
+    add_key_parser.add_argument("key", help="the new string key")
+    add_key_parser.add_argument("--lang", default="en", help="language code for the localization (default: en)")
+    add_key_parser.add_argument("--value", help="the string value for a simple (non-plural) entry")
+    add_key_parser.add_argument(
         "--plural",
         action="append",
         metavar="CATEGORY=VALUE",
         help="a plural category and its value, e.g. one='1 item' (repeatable); mutually exclusive with --value",
     )
-    add_parser.add_argument("--state", choices=STATE_CHOICES, default="translated", help="stringUnit state (default: translated)")
-    add_parser.add_argument("--extraction-state", default="manual", help="entry extractionState (default: manual)")
-    add_parser.add_argument("--comment", help="optional entry-level translator comment")
+    add_key_parser.add_argument("--state", choices=STATE_CHOICES, default="translated", help="stringUnit state (default: translated)")
+    add_key_parser.add_argument("--extraction-state", default="manual", help="entry extractionState (default: manual)")
+    add_key_parser.add_argument("--comment", help="optional entry-level translator comment")
 
-    update_parser = subparsers.add_parser(
-        "update",
+    update_key_parser = subparsers.add_parser(
+        "update-key",
         help="modify an existing entry",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstrings-cli update cancelButton --value 'Nevermind'\n"
-            "  xcstrings-cli update cancelButton --lang fr --value 'Annuler' --state translated\n"
-            "  xcstrings-cli update daysAgoLabel --plural other='%d days ago now'\n"
-            "  xcstrings-cli update cancelButton --state needs_review\n"
+            "  xcstrings-cli update-key cancelButton --value 'Nevermind'\n"
+            "  xcstrings-cli update-key cancelButton --lang fr --value 'Annuler' --state translated\n"
+            "  xcstrings-cli update-key daysAgoLabel --plural other='%d days ago now'\n"
+            "  xcstrings-cli update-key cancelButton --state needs_review\n"
         ),
     )
-    update_parser.add_argument("key", help="the string key to update")
-    update_parser.add_argument("--lang", default="en", help="language code for the localization (default: en)")
-    update_parser.add_argument("--value", help="new string value for a simple (non-plural) entry")
-    update_parser.add_argument(
+    update_key_parser.add_argument("key", help="the string key to update")
+    update_key_parser.add_argument("--lang", default="en", help="language code for the localization (default: en)")
+    update_key_parser.add_argument("--value", help="new string value for a simple (non-plural) entry")
+    update_key_parser.add_argument(
         "--plural",
         action="append",
         metavar="CATEGORY=VALUE",
         help="a plural category and its new value, e.g. other='%%d items' (repeatable)",
     )
-    update_parser.add_argument("--state", choices=STATE_CHOICES, help="new stringUnit state")
-    update_parser.add_argument("--comment", help="replace the entry-level translator comment")
+    update_key_parser.add_argument("--state", choices=STATE_CHOICES, help="new stringUnit state")
+    update_key_parser.add_argument("--comment", help="replace the entry-level translator comment")
 
-    delete_parser = subparsers.add_parser(
-        "delete",
+    delete_key_parser = subparsers.add_parser(
+        "delete-key",
         help="remove an entry or one of its localizations",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[file_parent],
         epilog=(
             "examples:\n"
-            "  xcstrings-cli delete oldUnusedKey\n"
-            "  xcstrings-cli delete cancelButton --lang fr\n"
+            "  xcstrings-cli delete-key oldUnusedKey\n"
+            "  xcstrings-cli delete-key cancelButton --lang fr\n"
         ),
     )
-    delete_parser.add_argument("key", help="the string key to delete")
-    delete_parser.add_argument("--lang", help="only delete this language's localization, keeping the rest of the entry")
+    delete_key_parser.add_argument("key", help="the string key to delete")
+    delete_key_parser.add_argument("--lang", help="only delete this language's localization, keeping the rest of the entry")
 
     return parser
 
@@ -601,7 +601,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "add" and args.value is not None and args.plural:
+    if args.command == "add-key" and args.value is not None and args.plural:
         parser.error("--value and --plural are mutually exclusive")
 
     if args.file is None:
@@ -619,16 +619,16 @@ def main(argv: list[str] | None = None) -> int:
         catalog = load_catalog(args.file)
 
         commands = {
-            "list": cmd_list,
-            "get": cmd_get,
+            "list-keys": cmd_list_keys,
+            "get-key": cmd_get_key,
             "find-key": cmd_find_key,
             "find-value": cmd_find_value,
-            "source-language": cmd_source_language,
-            "total-key-count": cmd_total_key_count,
-            "total-language-count": cmd_total_language_count,
-            "add": cmd_add,
-            "update": cmd_update,
-            "delete": cmd_delete,
+            "get-source-language": cmd_get_source_language,
+            "count-keys": cmd_count_keys,
+            "count-key-languages": cmd_count_key_languages,
+            "add-key": cmd_add_key,
+            "update-key": cmd_update_key,
+            "delete-key": cmd_delete_key,
         }
         commands[args.command](args, catalog)
 
