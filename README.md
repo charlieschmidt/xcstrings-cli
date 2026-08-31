@@ -10,7 +10,7 @@ A command-line tool for inspecting and editing Xcode String Catalog (`.xcstrings
 
 `--file` is optional — if omitted, the tool searches the current directory recursively for the first `*.xcstrings` file.
 
-Commands: `list`, `get`, `find-key`, `find-value`, `total-key-count`, `total-language-count` (read-only), and `add`, `update`, `delete` (which rewrite the file in Xcode's own format so diffs stay clean).
+Commands: `list`, `get`, `find-key`, `find-value`, `source-language`, `total-key-count`, `total-language-count` (read-only), and `add`, `update`, `delete` (which rewrite the file in Xcode's own format so diffs stay clean).
 
 ```
 ./xcstrings-cli list --missing fr

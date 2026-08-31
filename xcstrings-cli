@@ -37,9 +37,10 @@ localization is either a plain "stringUnit" (a value + a state of "new",
 categories ("zero", "one", "two", "few", "many", "other"), each itself holding
 a "stringUnit".
 
-This tool exposes nine subcommands -- list, get, find-key, find-value, add,
-update, delete, total-key-count, total-language-count -- for scripting edits
-to this format from outside Xcode. Pass --full-help to print the full docs.
+This tool exposes ten subcommands -- list, get, find-key, find-value, add,
+update, delete, source-language, total-key-count, total-language-count -- for
+scripting edits to this format from outside Xcode. Pass --full-help to print
+the full docs.
 """
 
 from __future__ import annotations
@@ -70,7 +71,7 @@ CLI for reading/editing an Xcode String Catalog (`Canopy/Localizable.xcstrings` 
 xcstrings-cli <command> [args] [--file PATH]
 ```
 
-`--file` is optional: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list`/`get`/`find-key`/`find-value`/`total-key-count`/`total-language-count` are read-only. `add`/`update`/`delete` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
+`--file` is optional: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list`/`get`/`find-key`/`find-value`/`source-language`/`total-key-count`/`total-language-count` are read-only. `add`/`update`/`delete` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
 
 Pass `--full-help` (in place of a subcommand) to print this file's contents directly, e.g. `xcstrings-cli --full-help`.
 
@@ -82,6 +83,7 @@ Pass `--full-help` (in place of a subcommand) to print this file's contents dire
 | `get KEY` | Show one entry | `--lang LANG` (one language only), `--json` (raw JSON) | `get cancelButton --lang fr` |
 | `find-key TEXT` | Case-insensitive substring search over keys, printing one match per line; if `TEXT` contains `* ? [`, it's a glob pattern matched against the whole key instead (e.g. `shared*lant*`) | `--case-sensitive` | `find-key 'shared*lant*'` |
 | `find-value TEXT` | Same search, over localization values instead of keys; prints `key  (lang/category: 'value')` per match | `--lang LANG`, `--case-sensitive` | `find-value Annuler --lang fr` |
+| `source-language` | Print the catalog's `sourceLanguage` | — | `source-language` |
 | `total-key-count` | Print number of keys in catalog | — | `total-key-count` |
 | `total-language-count` | Print number of distinct languages used anywhere in the catalog (union of every key's localizations) | `--list` (also print each language code) | `total-language-count --list` |
 | `add KEY` | Create a new entry (errors if key exists) | `--value STR` (simple string) *or* `--plural CATEGORY=VALUE` (repeatable, mutually exclusive with `--value`), `--lang` (default `en`), `--state {new,needs_review,translated}` (default `translated`), `--extraction-state` (default `manual`), `--comment` | `add cancelButton --value 'Cancel'` |
@@ -291,6 +293,11 @@ def cmd_find_value(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
                     print(f"{key}  ({lang}/{label}: {value!r})")
 
 
+def cmd_source_language(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
+    """Print the catalog's sourceLanguage."""
+    print(catalog.get("sourceLanguage", ""))
+
+
 def cmd_total_key_count(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
     """Print the total number of keys in the catalog."""
     print(len(_entries(catalog)))
@@ -361,7 +368,7 @@ def cmd_delete(args: argparse.Namespace, catalog: dict[str, Any]) -> None:
         del _entries(catalog)[args.key]
 
 
-READ_ONLY_COMMANDS = {"list", "get", "find-key", "find-value", "total-key-count", "total-language-count"}
+READ_ONLY_COMMANDS = {"list", "get", "find-key", "find-value", "source-language", "total-key-count", "total-language-count"}
 
 
 def print_full_help() -> int:
@@ -400,6 +407,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  xcstrings-cli find-key 'shared*lant*'\n"
             "  xcstrings-cli add cancelButton --value 'Cancel'\n"
             "  xcstrings-cli update cancelButton --lang fr --value 'Annuler'\n"
+            "  xcstrings-cli source-language\n"
             "  xcstrings-cli total-key-count\n"
             "  xcstrings-cli total-language-count\n"
             "\n"
@@ -486,6 +494,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     find_value_parser.add_argument("--lang", help="only search values for this language")
     find_value_parser.add_argument("--case-sensitive", action="store_true", help="match case exactly")
+
+    subparsers.add_parser(
+        "source-language",
+        help="print the catalog's sourceLanguage",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        parents=[file_parent],
+        epilog=("examples:\n" "  xcstrings-cli source-language\n"),
+    )
 
     subparsers.add_parser(
         "total-key-count",
@@ -607,6 +623,7 @@ def main(argv: list[str] | None = None) -> int:
             "get": cmd_get,
             "find-key": cmd_find_key,
             "find-value": cmd_find_value,
+            "source-language": cmd_source_language,
             "total-key-count": cmd_total_key_count,
             "total-language-count": cmd_total_language_count,
             "add": cmd_add,

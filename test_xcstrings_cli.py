@@ -337,6 +337,18 @@ class ListCommandTests(unittest.TestCase):
         self.assertEqual(keys, ["daysAgoLabel"])
 
 
+class SourceLanguageCommandTests(unittest.TestCase):
+    def setUp(self):
+        self.catalog = make_fixture()
+
+    def test_source_language_prints_source_language(self):
+        args = cli.build_parser().parse_args(["source-language"])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli.cmd_source_language(args, self.catalog)
+        self.assertEqual(buf.getvalue().strip(), "en")
+
+
 class TotalKeyCountCommandTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_fixture()
