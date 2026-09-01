@@ -383,6 +383,18 @@ class CountKeyLanguagesCommandTests(unittest.TestCase):
         self.assertEqual(self._output(["--list"]), ["2", "en", "fr"])
 
 
+class GetLocalizationsCommandTests(unittest.TestCase):
+    def setUp(self):
+        self.catalog = make_fixture()
+
+    def test_get_localizations_prints_sorted_languages(self):
+        args = cli.build_parser().parse_args(["get-localizations"])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli.cmd_get_localizations(args, self.catalog)
+        self.assertEqual(buf.getvalue().splitlines(), ["en", "fr"])
+
+
 class MainEntryPointTests(unittest.TestCase):
     def test_end_to_end_add_update_delete(self):
         with tempfile.TemporaryDirectory() as tmp:
