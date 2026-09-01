@@ -68,10 +68,10 @@ FULL_HELP_TEXT = """\
 CLI for reading/editing an Xcode String Catalog (`Canopy/Localizable.xcstrings` in this project) without Xcode. Stdlib-only Python 3.9+.
 
 ```
-xcstrings-cli <command> [args] [--file PATH]
+xcstrings-cli [--file PATH] <command> [args] [--file PATH]
 ```
 
-`--file` is optional: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list-keys`/`get-key`/`find-key`/`find-value`/`get-source-language`/`count-keys`/`count-key-languages` are read-only. `add-key`/`update-key`/`delete-key` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
+`--file` is optional and may be given before or after the subcommand: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list-keys`/`get-key`/`find-key`/`find-value`/`get-source-language`/`count-keys`/`count-key-languages` are read-only. `add-key`/`update-key`/`delete-key` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
 
 Pass `--full-help` (in place of a subcommand) to print this file's contents directly, e.g. `xcstrings-cli --full-help`.
 
@@ -378,7 +378,12 @@ def print_full_help() -> int:
 
 
 def _make_file_parent() -> argparse.ArgumentParser:
-    """A shared parent parser for --file, attached to each subcommand (so it goes after the subcommand name, e.g. `list-keys --file path`)."""
+    """A shared parent parser for --file, attached to each subcommand for help-text purposes.
+
+    The actual value is extracted from argv before argparse ever sees it (see
+    _extract_file_option), so --file works whether it's given before or after the
+    subcommand name, e.g. both `--file path list-keys` and `list-keys --file path`.
+    """
     file_parent = argparse.ArgumentParser(add_help=False)
     file_parent.add_argument(
         "--file",
@@ -413,8 +418,8 @@ def build_parser() -> argparse.ArgumentParser:
             "\n"
             "By default the tool operates on the first .xcstrings file found under\n"
             "the current directory (searched recursively, skipping dot-directories\n"
-            "such as .git or .claude); pass --file PATH after any subcommand to\n"
-            "target a different catalog.\n"
+            "such as .git or .claude); pass --file PATH (before or after the\n"
+            "subcommand) to target a different catalog.\n"
             "\n"
             "Pass --full-help for a full worked example of every subcommand."
         ),
@@ -593,16 +598,44 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _extract_file_option(argv: list[str]) -> tuple[list[str], Path | None]:
+    """Pull `--file PATH`/`--file=PATH` out of argv wherever it appears, so --file may be
+    passed before or after the subcommand. Returns the remaining argv (for argparse to
+    parse as usual) and the extracted path, or None if --file wasn't given.
+    """
+    remaining: list[str] = []
+    file_value: str | None = None
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--file" and i + 1 < len(argv):
+            file_value = argv[i + 1]
+            i += 2
+            continue
+        if arg.startswith("--file="):
+            file_value = arg[len("--file=") :]
+            i += 1
+            continue
+        remaining.append(arg)
+        i += 1
+    return remaining, Path(file_value) if file_value is not None else None
+
+
 def main(argv: list[str] | None = None) -> int:
     raw_args = sys.argv[1:] if argv is None else argv
     if "--full-help" in raw_args:
         return print_full_help()
 
+    raw_args, file_override = _extract_file_option(raw_args)
+
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(raw_args)
 
     if args.command == "add-key" and args.value is not None and args.plural:
         parser.error("--value and --plural are mutually exclusive")
+
+    if file_override is not None:
+        args.file = file_override
 
     if args.file is None:
         found = find_catalog_file()

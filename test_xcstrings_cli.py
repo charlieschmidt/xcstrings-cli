@@ -398,6 +398,21 @@ class MainEntryPointTests(unittest.TestCase):
             self.assertEqual(cli.main(["delete-key", "greeting", "--file", str(path)]), 0)
             self.assertNotIn("greeting", cli.load_catalog(path)["strings"])
 
+    def test_file_option_before_subcommand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Localizable.xcstrings"
+            cli.save_catalog(path, make_fixture())
+
+            self.assertEqual(cli.main(["--file", str(path), "add-key", "greeting", "--value", "Hi"]), 0)
+            self.assertEqual(cli.load_catalog(path)["strings"]["greeting"]["localizations"]["en"]["stringUnit"]["value"], "Hi")
+
+    def test_file_option_with_equals_form(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Localizable.xcstrings"
+            cli.save_catalog(path, make_fixture())
+
+            self.assertEqual(cli.main([f"--file={path}", "count-keys"]), 0)
+
     def test_main_returns_1_on_cli_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "Localizable.xcstrings"
