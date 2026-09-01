@@ -426,6 +426,13 @@ class MainEntryPointTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cli.main(["add-key", "x", "--value", "a", "--plural", "one=b", "--file", str(path)])
 
+    def test_version_prints_version_and_exits_zero(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), self.assertRaises(SystemExit) as ctx:
+            cli.main(["--version"])
+        self.assertEqual(ctx.exception.code, 0)
+        self.assertIn(cli.__version__, buf.getvalue())
+
     def test_full_help_prints_docs_file(self):
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):

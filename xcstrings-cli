@@ -54,6 +54,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+__version__ = "1.1.0"
+
 STATE_CHOICES = ("new", "needs_review", "translated")
 PLURAL_CATEGORIES = ("zero", "one", "two", "few", "many", "other")
 
@@ -65,7 +67,7 @@ FULL_HELP_TEXT = """\
 
 **Use this tool, not ad-hoc Python, to inspect or edit an `.xcstrings` file.** It's already executable with the interpreter in its shebang — run `xcstrings-cli ...`, not `python3 xcstrings-cli ...`.
 
-CLI for reading/editing an Xcode String Catalog (`Canopy/Localizable.xcstrings` in this project) without Xcode. Stdlib-only Python 3.9+.
+CLI for reading/editing an Xcode String Catalog (`Localizable.xcstrings` in this project) without Xcode. Stdlib-only Python 3.9+.
 
 ```
 xcstrings-cli [--file PATH] <command> [args] [--file PATH]
@@ -73,7 +75,7 @@ xcstrings-cli [--file PATH] <command> [args] [--file PATH]
 
 `--file` is optional and may be given before or after the subcommand: omitted, it recursively searches the cwd for the first `*.xcstrings` file, skipping dot-directories (`.git`, `.claude`, etc.) so stale worktree/cache copies aren't picked up. Errors out if none found. `list-keys`/`get-key`/`find-key`/`find-value`/`get-source-language`/`count-keys`/`count-key-languages` are read-only. `add-key`/`update-key`/`delete-key` rewrite the whole file in Xcode's own format (alphabetical keys, 2-space indent) so diffs stay clean.
 
-Pass `--full-help` (in place of a subcommand) to print this file's contents directly, e.g. `xcstrings-cli --full-help`.
+Pass `--full-help` (in place of a subcommand) to print this file's contents directly, e.g. `xcstrings-cli --full-help`. Pass `--version` to print the installed version and exit.
 
 ## Commands
 
@@ -95,13 +97,6 @@ Plural categories are CLDR: `zero one two few many other` (not all apply to ever
 ## Format notes
 
 Each entry's `localizations[lang]` is either `{"stringUnit": {"state", "value"}}` (plain string) or `{"variations": {"plural": {category: {"stringUnit": {...}}}}}`. `state` progresses `new` → `needs_review` → `translated`. Entries also carry `extractionState` (always `manual` in this project) and an optional translator `comment`.
-
-## Testing
-
-```
-python3 -m unittest test_xcstrings_cli.py -v
-```
-Covers every subcommand against a fixture catalog plus a byte-for-byte round-trip check against `Canopy/Localizable.xcstrings` to confirm output formatting matches Xcode's own.
 """
 
 
@@ -428,6 +423,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--full-help",
         action="store_true",
         help="print the full docs (command reference and format notes) and exit",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="print the version number and exit",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
