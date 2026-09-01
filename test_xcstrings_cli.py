@@ -73,9 +73,9 @@ class RealCatalogFormatTests(unittest.TestCase):
     """Proves save_catalog() reproduces Xcode's own serialization byte-for-byte."""
 
     def test_roundtrip_matches_real_file_bytes(self):
-        real_path = Path(__file__).resolve().parent / "Canopy" / "Localizable.xcstrings"
+        real_path = Path(__file__).resolve().parent / "Test" / "Localizable.xcstrings"
         if not real_path.exists():
-            self.skipTest("Canopy/Localizable.xcstrings not present in this checkout")
+            self.skipTest("Test/Localizable.xcstrings not present in this checkout")
 
         original_bytes = real_path.read_bytes()
         catalog = cli.load_catalog(real_path)
